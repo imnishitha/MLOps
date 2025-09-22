@@ -21,13 +21,11 @@ def run():
 
     # Header
     st.title("🌸 Iris Flower Prediction Dashboard")
-    st.markdown("Upload your input file and get instant predictions powered by FastAPI + Streamlit.")
+    st.markdown("Upload your input file or use a random sample to get predictions powered by FastAPI + Streamlit.")
 
     # Sidebar: backend health check
     with st.sidebar:
         st.header("⚙️ Configuration")
-
-        # Backend health check
         try:
             backend_request = requests.get(FASTAPI_BACKEND_ENDPOINT)
             if backend_request.status_code == 200:
@@ -38,25 +36,43 @@ def run():
             LOGGER.error(ce)
             st.error("❌ Backend offline")
 
-    # Centered file uploader
-    st.subheader("📂 Upload test prediction JSON file")
-
     col1, col2, col3 = st.columns([1,2,1])
     with col2:
+        st.subheader("📂 Input Options")
+        if st.button("🎲 Use Random Sample"):
+            try:
+                response = requests.get(f"{FASTAPI_BACKEND_ENDPOINT}/random_sample")
+                if response.status_code == 200:
+                    random_sample = response.json()
+                    st.session_state["RANDOM_SAMPLE"] = random_sample
+                    st.session_state["IS_JSON_FILE_AVAILABLE"] = True
+                    st.success("🎉 Random sample loaded!")
+                else:
+                    st.error(f"Failed to fetch random sample: {response.status_code}")
+            except Exception as e:
+                LOGGER.error(e)
+                st.error("Error connecting to backend for random sample.")
+
         test_input_file = st.file_uploader(
-            "Choose a file",
+            "Or upload your own JSON file",
             type=['json'],
             label_visibility="collapsed",
             help="Upload a JSON file with the input_test field."
         )
 
+
     if test_input_file:
-        st.write("### 🔎 File Preview")
         test_input_data = json.load(test_input_file)
+        st.write("### 🔎 File Preview")
         st.json(test_input_data)
         st.session_state["IS_JSON_FILE_AVAILABLE"] = True
+    elif "RANDOM_SAMPLE" in st.session_state:
+        test_input_data = st.session_state["RANDOM_SAMPLE"]
+        st.write("### 🔎 Random Sample Preview")
+        st.json(test_input_data)
     else:
         st.session_state["IS_JSON_FILE_AVAILABLE"] = False
+        test_input_data = None
 
     # Centered predict button
     with col2:
@@ -67,7 +83,7 @@ def run():
     st.subheader("📊 Prediction Results")
 
     if predict_button:
-        if st.session_state.get("IS_JSON_FILE_AVAILABLE", False):
+        if st.session_state.get("IS_JSON_FILE_AVAILABLE", False) and test_input_data:
             if FASTAPI_IRIS_MODEL_LOCATION.is_file():
                 client_input = json.dumps(test_input_data['input_test'])
                 try:
@@ -93,8 +109,7 @@ def run():
                 LOGGER.warning("iris_model.pkl not found")
                 st.toast(":red[Model not found. Please run train.py to generate iris_model.pkl]", icon="🔥")
         else:
-            LOGGER.error("No valid JSON file provided")
-            st.toast(":red[Please upload a valid JSON file with input_test field.]", icon="⚠️")
+            st.error("Please upload a JSON file or use the random sample button first.")
 
 if __name__ == "__main__":
     run()
