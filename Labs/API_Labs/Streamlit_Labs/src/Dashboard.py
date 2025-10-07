@@ -23,10 +23,13 @@ def run():
         page_icon="🪻",
     )
 
-    # Build the sidebar first
-    # This sidebar context gives access to work on elements in the side panel
+    # Header
+    st.title("🌸 Iris Flower Prediction Dashboard")
+    st.markdown("Upload your input file or use a random sample to get predictions powered by FastAPI + Streamlit.")
+
+    # Sidebar: backend health check
     with st.sidebar:
-        # Check the status of backend
+        st.header("⚙️ Configuration")
         try:
             # Make sure fast api is running. Check the lab for guidance on getting
             # the server up and running
@@ -40,47 +43,60 @@ def run():
                 st.warning("Problem connecting 😭")
         except requests.ConnectionError as ce:
             LOGGER.error(ce)
-            LOGGER.error("Backend offline 😱")
-            # Show backend offline message
-            st.error("Backend offline 😱")
+            st.error("❌ Backend offline")
 
-        st.info("Configure parameters")
-        # Set the values
-        # sepal_length = st.slider("Sepal Length",4.3, 7.9, 4.3, 0.1, help="Sepal length in centimeter (cm)", format="%f")
-        # sepal_width = st.slider("Sepal Width",2.0, 4.4, 2.0, 0.1, help="Sepal width in centimeter (cm)", format="%f")
-        # petal_length = st.slider("Petal Length",1.0, 6.9, 1.0, 0.1, help="Petal length in centimeter (cm)", format="%f")
-        # petal_width = st.slider("Petal Width",0.1, 2.5, 0.1, 0.1, help="Petal width in centimeter (cm)", format="%f")
-        
-        # Take JSON file as input
-        test_input_file = st.file_uploader('Upload test prediction file',type=['json'])
+    col1, col2, col3 = st.columns([1,2,1])
+    with col2:
+        st.subheader("📂 Input Options")
+        if st.button("🎲 Use Random Sample"):
+            try:
+                response = requests.get(f"{FASTAPI_BACKEND_ENDPOINT}/random_sample")
+                if response.status_code == 200:
+                    random_sample = response.json()
+                    st.session_state["RANDOM_SAMPLE"] = random_sample
+                    st.session_state["IS_JSON_FILE_AVAILABLE"] = True
+                    st.success("🎉 Random sample loaded!")
+                else:
+                    st.error(f"Failed to fetch random sample: {response.status_code}")
+            except Exception as e:
+                LOGGER.error(e)
+                st.error("Error connecting to backend for random sample.")
 
-        # Check if client has provided input test file
-        if test_input_file:
-            # Quick preview functionality for JSON input file
-            st.write('Preview file')
-            test_input_data = json.load(test_input_file)
-            st.json(test_input_data)
-            # Session is necessary, because the sidebar context acts within a 
-            # scope, so to access information outside the scope
-            # we need to save the information into a session variable
-            st.session_state["IS_JSON_FILE_AVAILABLE"] = True
-        else:
-            # If user adds file, then performs prediction and then removes
-            # file, the session var should revert back since file 
-            # is not available
-            st.session_state["IS_JSON_FILE_AVAILABLE"] = False
-            
-        # Predict button
-        predict_button = st.button('Predict')
+        test_input_file = st.file_uploader(
+            "Or upload your own JSON file",
+            type=['json'],
+            label_visibility="collapsed",
+            help="Upload a JSON file with the input_test field."
+        )
+
+
+    if test_input_file:
+        test_input_data = json.load(test_input_file)
+        st.write("### 🔎 File Preview")
+        st.json(test_input_data)
+        st.session_state["IS_JSON_FILE_AVAILABLE"] = True
+    elif "RANDOM_SAMPLE" in st.session_state:
+        test_input_data = st.session_state["RANDOM_SAMPLE"]
+        st.write("### 🔎 Random Sample Preview")
+        st.json(test_input_data)
+    else:
+        st.session_state["IS_JSON_FILE_AVAILABLE"] = False
+        test_input_data = None
+
+    # Centered predict button
+    with col2:
+        predict_button = st.button("🚀 Predict", use_container_width=True)
+
+    # Prediction results
+    st.divider()
+    st.subheader("📊 Prediction Results")
 
     # Dashboard body
     # Heading for the dashboard
     st.write("# Iris Flower Prediction! 🪻")
     # If predict button is pressed
     if predict_button:
-        # check if file is available
-        if "IS_JSON_FILE_AVAILABLE" in st.session_state and st.session_state["IS_JSON_FILE_AVAILABLE"]:
-            # Check if iris_model.pkl is in FastAPI folder
+        if st.session_state.get("IS_JSON_FILE_AVAILABLE", False) and test_input_data:
             if FASTAPI_IRIS_MODEL_LOCATION.is_file():
                 # The input needs to be converted from dictionary
                 # to JSON since content exchange format type is set
@@ -127,9 +143,7 @@ def run():
                 LOGGER.warning('iris_model.pkl not found in FastAPI Lab. Make sure to run train.py to get the model.')
                 st.toast(':red[Model iris_model.pkl not found. Please run the train.py file in FastAPI Lab]', icon="🔥")
         else:
-            # Message for invalid JSON file
-            LOGGER.error('Provide a valid JSON file with input_test field')
-            st.toast(':red[Please upload a JSON test file. Check data folder for test file.]')
+            st.error("Please upload a JSON file or use the random sample button first.")
 
 if __name__ == "__main__":
     run()
