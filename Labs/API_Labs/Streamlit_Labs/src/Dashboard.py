@@ -4,19 +4,23 @@ import streamlit as st
 from pathlib import Path
 from streamlit.logger import get_logger
 
-# FastAPI backend endpoint
+# If you start the fast api server on a different port
+# make sure to change the port below
 FASTAPI_BACKEND_ENDPOINT = "http://localhost:8000"
+
+# Make sure you have iris_model.pkl file in FastAPI_Labs/src folder.
+# If it's missing run train.py in FastAPI_Labs/src folder
+# If your FastAPI_Labs folder name is different, update accordingly in the following path
 FASTAPI_IRIS_MODEL_LOCATION = Path(__file__).resolve().parents[2] / 'FastAPI_Labs' / 'model' / 'iris_model.pkl'
 
-# Streamlit logger
+# streamlit logger
 LOGGER = get_logger(__name__)
 
 def run():
-    # Page settings
+    # Set the main dashboard page browser tab title and icon
     st.set_page_config(
-        page_title="🌸 Iris Flower Prediction",
+        page_title="Iris Flower Prediction Demo",
         page_icon="🪻",
-        layout="wide"
     )
 
     # Header
@@ -27,11 +31,16 @@ def run():
     with st.sidebar:
         st.header("⚙️ Configuration")
         try:
+            # Make sure fast api is running. Check the lab for guidance on getting
+            # the server up and running
             backend_request = requests.get(FASTAPI_BACKEND_ENDPOINT)
+            # If backend returns successful connection (status code: 200)
             if backend_request.status_code == 200:
-                st.success("✅ Backend online")
+                # This creates a green box with message
+                st.success("Backend online ✅")
             else:
-                st.warning("⚠️ Backend reachable but not healthy")
+                # This creates a yellow bow with message
+                st.warning("Problem connecting 😭")
         except requests.ConnectionError as ce:
             LOGGER.error(ce)
             st.error("❌ Backend offline")
@@ -82,32 +91,57 @@ def run():
     st.divider()
     st.subheader("📊 Prediction Results")
 
+    # Dashboard body
+    # Heading for the dashboard
+    st.write("# Iris Flower Prediction! 🪻")
+    # If predict button is pressed
     if predict_button:
         if st.session_state.get("IS_JSON_FILE_AVAILABLE", False) and test_input_data:
             if FASTAPI_IRIS_MODEL_LOCATION.is_file():
+                # The input needs to be converted from dictionary
+                # to JSON since content exchange format type is set
+                # as JSON by default
+                # client_input = json.dumps({
+                #     "petal_length": petal_length,
+                #     "sepal_length": sepal_length,
+                #     "petal_width": petal_width,
+                #     "sepal_width": sepal_width
+                # })
                 client_input = json.dumps(test_input_data['input_test'])
                 try:
+                    # This holds the result. Acts like a placeholder
+                    # that we can fill and empty as required
                     result_container = st.empty()
-                    with st.spinner("🔮 Model is predicting..."):
-                        predict_iris_response = requests.post(
-                            f"{FASTAPI_BACKEND_ENDPOINT}/predict", client_input
-                        )
+                    # While the model predicts show a spinner indicating model is
+                    # running the prediction
+                    with st.spinner('Predicting...'):
+                        # Send post request to backend predict endpoint
+                        predict_iris_response = requests.post(f'{FASTAPI_BACKEND_ENDPOINT}/predict', client_input)
+                    # If prediction status OK
                     if predict_iris_response.status_code == 200:
+                        # Convert response from JSON to dictionary
                         iris_content = json.loads(predict_iris_response.content)
-                        label_map = {0: "Setosa 🌱", 1: "Versicolor 🌿", 2: "Virginica 🌸"}
-                        predicted_label = label_map.get(iris_content["response"], "Unknown ❓")
-                        result_container.success(f"✅ The flower predicted is: **{predicted_label}**")
+                        start_sentence = "The flower predicted is: "
+                        if iris_content["response"] == 0:
+                            result_container.success(f"{start_sentence} setosa")
+                        elif iris_content["response"] == 1:
+                            result_container.success(f"{start_sentence} versicolor")
+                        elif iris_content["response"] == 2:
+                            result_container.success(f"{start_sentence} virginica")
+                        else:
+                            result_container.error("Some problem occured while prediction")
+                            LOGGER.error("Problem during prediction")
                     else:
-                        st.toast(
-                            f":red[Server returned {predict_iris_response.status_code}. Try again.]",
-                            icon="🔴"
-                        )
+                        # Pop up notification at bottom-left if backend is down
+                        st.toast(f':red[Status from server: {predict_iris_response.status_code}. Refresh page and check backend status]', icon="🔴")
                 except Exception as e:
-                    st.toast(":red[Problem with backend connection.]", icon="🔴")
+                    # Pop up notification if backend is down
+                    st.toast(':red[Problem with backend. Refresh page and check backend status]', icon="🔴")
                     LOGGER.error(e)
             else:
-                LOGGER.warning("iris_model.pkl not found")
-                st.toast(":red[Model not found. Please run train.py to generate iris_model.pkl]", icon="🔥")
+                # Message for iris_model.pkl not found
+                LOGGER.warning('iris_model.pkl not found in FastAPI Lab. Make sure to run train.py to get the model.')
+                st.toast(':red[Model iris_model.pkl not found. Please run the train.py file in FastAPI Lab]', icon="🔥")
         else:
             st.error("Please upload a JSON file or use the random sample button first.")
 
