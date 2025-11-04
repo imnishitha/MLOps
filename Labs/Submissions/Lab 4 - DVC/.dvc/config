@@ -1,0 +1,5 @@
+[core]
+    remote = myremote
+['remote "myremote"']
+    url = gs://dvc-mlops
+    credentialpath = /Users/nishitha/Desktop/Learn/MLOps/MLOps/Data_Concept_Drift.json
