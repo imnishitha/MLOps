@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Iris Classifier</title>
+</head>
+<body>
+  <h2>Iris Flower Classifier (ML Demo)</h2>
+
+  <input id="s1" placeholder="Sepal Length">
+  <input id="s2" placeholder="Sepal Width">
+  <input id="s3" placeholder="Petal Length">
+  <input id="s4" placeholder="Petal Width">
+  <button onclick="predict()">Predict</button>
+
+  <p id="out"></p>
+
+  <script>
+    async function predict() {
+      const values = {
+        sepal_length: parseFloat(document.getElementById("s1").value),
+        sepal_width: parseFloat(document.getElementById("s2").value),
+        petal_length: parseFloat(document.getElementById("s3").value),
+        petal_width: parseFloat(document.getElementById("s4").value)
+      };
+
+      const res = await fetch("/predict", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(values)
+      });
+
+      const data = await res.json();
+      document.getElementById("out").innerText = "Prediction: Iris class " + data.class;
+    }
+  </script>
+</body>
+</html>
